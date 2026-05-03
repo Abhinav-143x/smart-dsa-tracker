@@ -1,44 +1,29 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '@/lib/api';
 import { Problem, TopicResponse } from '@/types';
-import { ProblemCard } from '@/components/ProblemCard';
-import { Search, Filter, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ProgressDashboard } from '@/components/ProgressDashboard';
+import { TopicAccordion } from '@/components/TopicAccordion';
+import { Search, Filter, Loader2, X, Command, Code2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ProblemsPage() {
   const [problems, setProblems] = useState<Problem[]>([]);
-  const [topics, setTopics] = useState<TopicResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
   // Filter states
   const [search, setSearch] = useState('');
-  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const pageSize = 12;
+  const [solvedIds, setSolvedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [problemsData, topicsData] = await Promise.all([
-          api.getProblems({
-            page,
-            size: pageSize,
-            topic: selectedTopic || undefined,
-            difficulty: selectedDifficulty || undefined,
-            search: search || undefined,
-          }),
-          api.getTopics(),
-        ]);
-        
+        const problemsData = await api.getProblems({ size: 1000 });
         setProblems(problemsData.items);
-        setTotalPages(problemsData.pages);
-        setTopics(topicsData);
       } catch (err) {
         setError('Failed to load problems. Make sure the backend service is running.');
         console.error(err);
@@ -46,160 +31,198 @@ export default function ProblemsPage() {
         setLoading(false);
       }
     };
+    fetchData();
+  }, []);
 
-    const timer = setTimeout(() => {
-      fetchData();
-    }, 300); // Debounce search
+  // Filter and Group problems
+  const filteredProblems = useMemo(() => {
+    return problems.filter(p => {
+      const matchesSearch = search === '' || 
+        p.title.toLowerCase().includes(search.toLowerCase()) ||
+        p.topic.toLowerCase().includes(search.toLowerCase());
+      const matchesDifficulty = !selectedDifficulty || p.difficulty === selectedDifficulty;
+      return matchesSearch && matchesDifficulty;
+    });
+  }, [problems, search, selectedDifficulty]);
 
-    return () => clearTimeout(timer);
-  }, [page, selectedTopic, selectedDifficulty, search]);
+  const groupedProblems = useMemo(() => {
+    return filteredProblems.reduce((acc, problem) => {
+      if (!acc[problem.topic]) acc[problem.topic] = [];
+      acc[problem.topic].push(problem);
+      return acc;
+    }, {} as Record<string, Problem[]>);
+  }, [filteredProblems]);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearch(e.target.value);
-    setPage(1); // Reset to first page on search
-  };
+  // Progress metrics
+  const stats = useMemo(() => {
+    const getStats = (diff?: string) => {
+      const filtered = diff ? problems.filter(p => p.difficulty === diff) : problems;
+      return {
+        total: filtered.length,
+        solved: filtered.filter(p => solvedIds.has(p.id)).length
+      };
+    };
 
-  const clearFilters = () => {
-    setSearch('');
-    setSelectedTopic(null);
-    setSelectedDifficulty(null);
-    setPage(1);
+    return {
+      total: problems.length,
+      solved: solvedIds.size,
+      easy: getStats('Easy'),
+      medium: getStats('Medium'),
+      hard: getStats('Hard'),
+    };
+  }, [problems, solvedIds]);
+
+  const handleToggleSolved = (id: number) => {
+    setSolvedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 py-12 px-6 dark:bg-black">
-      <div className="mx-auto max-w-7xl">
-        <header className="mb-12">
-          <h1 className="mb-4 text-4xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Problem Explorer
-          </h1>
-          <p className="max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
-            Browse and search through 474+ curated DSA problems. Filter by topic and difficulty to target your practice.
-          </p>
-        </header>
+    <div className="min-h-screen bg-zinc-950 font-sans selection:bg-blue-500/30">
+      <ProgressDashboard 
+        total={stats.total}
+        solved={stats.solved}
+        easy={stats.easy}
+        medium={stats.medium}
+        hard={stats.hard}
+      />
 
-        {/* Filters Section */}
-        <div className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 flex-col gap-4 sm:flex-row">
-            {/* Search Input */}
-            <div className="relative flex-1">
-              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search problems, topics..."
-                value={search}
-                onChange={handleSearchChange}
-                className="h-11 w-full rounded-xl border border-zinc-200 bg-white pl-10 pr-4 text-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/10 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-              />
+      <main className="mx-auto max-w-7xl px-6 py-16">
+        {/* Hero Header */}
+        <div className="relative mb-20">
+          <div className="absolute -left-4 -top-4 h-24 w-24 rounded-full bg-blue-500/10 blur-3xl" />
+          <div className="relative">
+            <div className="mb-4 flex items-center gap-3 text-blue-500">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-500/20 bg-blue-500/10">
+                <Code2 className="h-4 w-4" />
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em]">Official Roadmap</span>
             </div>
+            <h1 className="text-5xl font-black tracking-tight text-white sm:text-6xl lg:text-7xl">
+              Striver's <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-indigo-400">A2Z</span> Sheet
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg font-medium leading-relaxed text-zinc-500">
+              Master the curriculum trusted by thousands. This tracker keeps your progress high-fidelity 
+              and your practice consistent.
+            </p>
+          </div>
+        </div>
 
-            {/* Topic Filter */}
-            <select
-              value={selectedTopic || ''}
-              onChange={(e) => {
-                setSelectedTopic(e.target.value || null);
-                setPage(1);
-              }}
-              className="h-11 rounded-xl border border-zinc-200 bg-white px-4 text-sm transition-all focus:border-blue-500 focus:outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100"
-            >
-              <option value="">All Topics</option>
-              {topics.map((t) => (
-                <option key={t.name} value={t.name}>
-                  {t.name} ({t.count})
-                </option>
-              ))}
-            </select>
-
-            {/* Difficulty Filter */}
-            <div className="flex rounded-xl border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-950">
-              {['Easy', 'Medium', 'Hard'].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => {
-                    setSelectedDifficulty(selectedDifficulty === d ? null : d);
-                    setPage(1);
-                  }}
-                  className={cn(
-                    "rounded-lg px-4 py-1.5 text-xs font-semibold transition-all",
-                    selectedDifficulty === d
-                      ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-black"
-                      : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-                  )}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
+        {/* Controls Section */}
+        <div className="mb-12 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative flex-1 max-w-2xl">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-600" />
+            <input
+              type="text"
+              placeholder="Search by topic, pattern or problem name..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-14 w-full rounded-2xl border border-zinc-900 bg-zinc-950 px-12 text-sm text-zinc-100 transition-all focus:border-blue-500/50 focus:outline-none focus:ring-4 focus:ring-blue-500/5 placeholder:text-zinc-700"
+            />
           </div>
 
-          {(search || selectedTopic || selectedDifficulty) && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-2 text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-            >
-              <X className="h-4 w-4" />
-              Clear Filters
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {['Easy', 'Medium', 'Hard'].map((d) => (
+              <button
+                key={d}
+                onClick={() => setSelectedDifficulty(selectedDifficulty === d ? null : d)}
+                className={cn(
+                  "h-11 rounded-xl border px-6 text-[10px] font-black uppercase tracking-widest transition-all",
+                  selectedDifficulty === d
+                    ? {
+                        'Easy': 'border-green-500/50 bg-green-500/10 text-green-500 shadow-[0_0_20px_rgba(34,197,94,0.1)]',
+                        'Medium': 'border-amber-500/50 bg-amber-500/10 text-amber-500 shadow-[0_0_20px_rgba(245,158,11,0.1)]',
+                        'Hard': 'border-red-500/50 bg-red-500/10 text-red-500 shadow-[0_0_20px_rgba(239,68,68,0.1)]',
+                      }[d]
+                    : "border-zinc-900 bg-zinc-950 text-zinc-500 hover:border-zinc-800 hover:text-zinc-300"
+                )}
+              >
+                {d}
+              </button>
+            ))}
+            
+            {(search || selectedDifficulty) && (
+              <button
+                onClick={() => {setSearch(''); setSelectedDifficulty(null);}}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-900 bg-zinc-950 text-zinc-500 transition-all hover:border-red-500/50 hover:text-red-500"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Content Section */}
         {loading ? (
-          <div className="flex h-64 flex-col items-center justify-center gap-4">
-            <Loader2 className="h-10 w-10 animate-spin text-zinc-300 dark:text-zinc-700" />
-            <p className="text-zinc-500">Loading problems...</p>
+          <div className="flex h-96 flex-col items-center justify-center gap-6">
+             <div className="h-12 w-12 rounded-full border-2 border-zinc-800 border-t-blue-500 animate-spin" />
+             <div className="flex flex-col items-center gap-1">
+               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-zinc-600">Syncing Intelligence</span>
+               <span className="text-xs font-bold text-zinc-800">Please wait...</span>
+             </div>
           </div>
         ) : error ? (
-          <div className="flex h-64 flex-col items-center justify-center gap-4 rounded-3xl border border-red-100 bg-red-50/50 p-12 text-center dark:border-red-900/20 dark:bg-red-900/10">
-            <p className="text-lg font-medium text-red-600 dark:text-red-400">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="rounded-full bg-red-600 px-6 py-2 text-sm font-bold text-white transition-all hover:bg-red-700"
-            >
-              Retry
-            </button>
+          <div className="flex flex-col items-center justify-center gap-6 rounded-[2rem] border border-red-500/10 bg-red-500/5 p-20 text-center">
+            <div className="rounded-2xl bg-red-500/10 p-4 ring-1 ring-red-500/20">
+              <X className="h-8 w-8 text-red-500" />
+            </div>
+            <div className="max-w-md">
+              <h3 className="text-2xl font-black text-white mb-3">Transmission Failed</h3>
+              <p className="text-zinc-500 mb-8 font-medium">{error}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="rounded-xl bg-white px-10 py-4 text-xs font-black uppercase tracking-widest text-black transition-all hover:bg-zinc-200 active:scale-95"
+              >
+                Retry Connection
+              </button>
+            </div>
           </div>
-        ) : problems.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-zinc-200 p-12 text-center dark:border-zinc-800">
-            <Filter className="h-12 w-12 text-zinc-300 dark:text-zinc-700" />
-            <p className="text-lg font-medium text-zinc-500">No problems found matching your filters.</p>
-            <button onClick={clearFilters} className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:underline">
-              Reset all filters
-            </button>
+        ) : filteredProblems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-6 rounded-[2rem] border-2 border-dashed border-zinc-900 py-32 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-zinc-900 text-zinc-800">
+              <Search className="h-10 w-10" />
+            </div>
+            <div className="max-w-xs">
+              <p className="text-xl font-black text-zinc-400">Zero matches</p>
+              <p className="mt-2 text-sm font-medium text-zinc-600">No problems found for your current filter configuration.</p>
+            </div>
           </div>
         ) : (
-          <>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {problems.map((p) => (
-                <ProblemCard key={p.id} problem={p} />
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-16 flex items-center justify-center gap-4">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white transition-all hover:bg-zinc-50 disabled:opacity-30 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-                >
-                  <ChevronLeft className="h-5 w-5" />
-                </button>
-                <span className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  Page {page} of {totalPages}
-                </span>
-                <button
-                  disabled={page === totalPages}
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 bg-white transition-all hover:bg-zinc-50 disabled:opacity-30 dark:border-zinc-800 dark:bg-zinc-950 dark:hover:bg-zinc-900"
-                >
-                  <ChevronRight className="h-5 w-5" />
-                </button>
-              </div>
-            )}
-          </>
+          <div className="flex flex-col">
+            {Object.entries(groupedProblems).map(([topic, topicProblems]) => (
+              <TopicAccordion
+                key={topic}
+                topic={topic}
+                problems={topicProblems}
+                solvedIds={solvedIds}
+                onToggleSolved={handleToggleSolved}
+              />
+            ))}
+          </div>
         )}
-      </div>
+      </main>
+
+      <footer className="mt-40 border-t border-zinc-900 bg-black/50 py-20">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="flex flex-col items-center justify-between gap-10 md:flex-row">
+            <div className="flex flex-col items-center gap-4 md:items-start">
+               <div className="flex items-center gap-2 text-zinc-400">
+                 <Sparkles className="h-4 w-4 text-blue-500" />
+                 <span className="text-xs font-black uppercase tracking-[0.2em]">Smart DSA Tracker</span>
+               </div>
+               <p className="text-sm font-bold text-zinc-700">Precision Practice. Optimized Results.</p>
+            </div>
+            <div className="h-10 w-px bg-zinc-900 hidden md:block" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-800">
+              © 2026 Smart DSA • For Private Practice Only
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

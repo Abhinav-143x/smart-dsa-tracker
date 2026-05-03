@@ -36,3 +36,27 @@ class SubtopicResponse(BaseModel):
     name: str
     count: int
     topic: str
+
+# --- Auth Schemas ---
+
+class UserBase(BaseModel):
+    username: str
+    email: Optional[str] = None
+
+class UserCreate(UserBase):
+    password: str
+
+class UserResponse(UserBase):
+    id: int
+    created_at: datetime
+    last_active: datetime
+
+    class Config:
+        from_attributes = True
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    username: Optional[str] = None

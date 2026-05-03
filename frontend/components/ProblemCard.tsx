@@ -1,7 +1,7 @@
 import React from 'react';
 import { Problem } from '@/types';
 import { cn } from '@/lib/utils';
-import { ExternalLink, Youtube, BookOpen, Code } from 'lucide-react';
+import { ExternalLink, Video, BookOpen, Code } from 'lucide-react';
 
 interface ProblemCardProps {
   problem: Problem;
@@ -68,7 +68,7 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({ problem }) => {
             className="flex items-center gap-1.5 text-xs font-medium text-zinc-600 hover:text-red-600 dark:text-zinc-400 dark:hover:text-red-400"
             title="Watch Tutorial"
           >
-            <Youtube className="h-3.5 w-3.5" />
+            <Video className="h-3.5 w-3.5" />
             <span>Video</span>
           </a>
         )}

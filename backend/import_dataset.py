@@ -29,12 +29,9 @@ def import_problems(json_path):
         
         for item in data:
             # Check if problem already exists
-            existing = db.query(Problem).filter(Problem.id == item['id']).first()
-            if existing:
-                continue
-
-            # Determine difficulty (default to Medium if not specified in JSON structure)
-            # The JSON seems to have some difficulty info in subtopics sometimes
+            problem = db.query(Problem).filter(Problem.id == item['id']).first()
+            
+            # Determine difficulty
             difficulty = "Medium"
             if "Easy" in item.get('subtopic', ''):
                 difficulty = "Easy"
@@ -43,18 +40,34 @@ def import_problems(json_path):
             elif "Medium" in item.get('subtopic', ''):
                 difficulty = "Medium"
 
-            problem = Problem(
-                id=item['id'],
-                title=item['name'],
-                topic=item['topic'],
-                subtopic=item['subtopic'],
-                difficulty=difficulty,
-                source_link=item['link'],
-                order_index=item['id'],
-                slug=f"{slugify(item['name'])}-{item['id']}",
-                leetcode_link=item['link'] if "leetcode.com" in item['link'] else None
-            )
-            db.add(problem)
+            if problem:
+                # Update existing problem
+                problem.title = item['name']
+                problem.topic = item['topic']
+                problem.subtopic = item['subtopic']
+                problem.difficulty = difficulty
+                problem.source_link = item['link']
+                problem.order_index = item.get('order_index', problem.order_index)
+                problem.leetcode_link = item['link'] if "leetcode.com" in item['link'] else None
+                problem.youtube_link = item.get('youtube_link')
+                problem.article_link = item.get('article_link')
+            else:
+                # Create new problem
+                problem = Problem(
+                    id=item['id'],
+                    title=item['name'],
+                    topic=item['topic'],
+                    subtopic=item['subtopic'],
+                    difficulty=difficulty,
+                    source_link=item['link'],
+                    order_index=item['id'],
+                    slug=f"{slugify(item['name'])}-{item['id']}",
+                    leetcode_link=item['link'] if "leetcode.com" in item['link'] else None,
+                    youtube_link=item.get('youtube_link'),
+                    article_link=item.get('article_link')
+                )
+                db.add(problem)
+            
             imported_count += 1
             
             if imported_count % 50 == 0:

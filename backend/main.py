@@ -1,12 +1,15 @@
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import List, Optional
+from datetime import datetime
 import os
 
-from database import engine, Base, get_db, Problem
+from database import engine, Base, get_db, Problem, User
 import schemas
+import auth
 
 # Initialize database
 Base.metadata.create_all(bind=engine)
@@ -38,12 +41,60 @@ async def root():
 async def health_check():
     return {"status": "healthy", "version": "0.1.0"}
 
+# --- Authentication Endpoints ---
+
+@app.post("/api/v1/auth/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
+def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    # Check if user already exists
+    db_user = db.query(User).filter(User.username == user.username).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
+    
+    if user.email:
+        db_email = db.query(User).filter(User.email == user.email).first()
+        if db_email:
+            raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create new user
+    hashed_password = auth.get_password_hash(user.password)
+    new_user = User(
+        username=user.username,
+        email=user.email,
+        hashed_password=hashed_password
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+@app.post("/api/v1/auth/login", response_model=schemas.Token)
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user or not auth.verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    access_token = auth.create_access_token(data={"sub": user.username})
+    
+    # Update last active
+    user.last_active = datetime.utcnow()
+    db.commit()
+    
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/api/v1/auth/me", response_model=schemas.UserResponse)
+def read_users_me(current_user: User = Depends(auth.get_current_user)):
+    return current_user
+
 # --- Problem Engine Endpoints ---
 
 @app.get("/api/v1/problems", response_model=schemas.ProblemListResponse)
 def list_problems(
     page: int = Query(1, ge=1),
-    size: int = Query(50, ge=1, le=100),
+    size: int = Query(50, ge=1, le=1000),
     topic: Optional[str] = None,
     difficulty: Optional[str] = None,
     search: Optional[str] = None,
