@@ -9,18 +9,21 @@ This document serves as the internal state tracker for the Smart DSA Tracker dev
 - FastAPI backend and Next.js frontend initialized.
 - SQLite schema implemented.
 
-### Phase 2: Problem Engine (60%)
-- **Status**: In Progress.
-- **Milestones**: 
+### Phase 2: Problem Engine (100%)
+- **Status**: Complete.
+- **Deliverables**: 
   - Dataset of 474 problems successfully imported.
-  - Implemented core API endpoints for problem listing, search, and topic exploration.
-- **Next Actions**:
-  - Develop frontend problem explorer UI using Next.js.
-  - Implement problem cards and filtering components.
+  - Core API endpoints for problem listing, search, and topic exploration.
+  - Professional Next.js Problem Explorer UI with search, filtering, and pagination.
 
 ### Phase 3: Progress System (0%)
-- **Status**: Pending.
+- **Status**: In Progress.
 - **Objective**: User authentication and individual progress tracking.
+- **Next Actions**:
+  - Implement JWT-based authentication in FastAPI.
+  - Create user registration and login endpoints.
+  - Build frontend authentication forms.
+  - Implement "Mark as Solved" functionality.
 
 ### Phase 4: Dashboard Intelligence (0%)
 - **Status**: Pending.

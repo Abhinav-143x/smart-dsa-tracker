@@ -16,10 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integrated dataset of 474 DSA problems.
 - Core API endpoints for problem listing, search, and filtering (`/api/v1/problems`).
 - Topic and subtopic exploration endpoints (`/api/v1/topics`, `/api/v1/subtopics`).
+- Professional Next.js Problem Explorer UI with search and filtering.
+- API client utility and shared type definitions.
 - Health check and automatic API documentation (Swagger/ReDoc).
 
 ### Planned
-- Problem search and filtering functionality.
 - User authentication and personalized progress system.
 - Dashboard with performance metrics and activity tracking.
 - Intelligent daily practice recommendation engine.
