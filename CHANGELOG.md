@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI Polishing**: Standardized spacing, alignment, and typography across the entire Sheet view.
 - **Enhanced Visual Feedback**: Added progress glows, line-through states for solved problems, and optimized dark mode contrast.
 - **Branding**: Added persistent TakeUForward quick-access button to the main dashboard.
+- **Source Control**: Initialized public GitHub repository and pushed the refined codebase.
 
 ### Fixed
 - Backend API constraint: Increased maximum page size to 1000 to support full curriculum views.

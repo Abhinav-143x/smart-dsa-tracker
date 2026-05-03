@@ -2,6 +2,8 @@
 
 The Smart DSA Tracker is a specialized execution system designed for users of the Striver DSA Sheet. It provides a structured environment to improve consistency, planning, and completion rates through data-driven tracking and intelligent practice recommendations.
 
+**Repository**: [Abhinav-143x/smart-dsa-tracker](https://github.com/Abhinav-143x/smart-dsa-tracker)
+
 ## Documentation Overview
 
 This project utilizes the Diátaxis framework to provide clear, goal-oriented documentation.
