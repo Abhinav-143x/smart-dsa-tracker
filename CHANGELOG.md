@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Core database schema for problems, users, progress tracking, and streaks.
 - Problem dataset import utility.
 - Integrated dataset of 474 DSA problems.
+- Core API endpoints for problem listing, search, and filtering (`/api/v1/problems`).
+- Topic and subtopic exploration endpoints (`/api/v1/topics`, `/api/v1/subtopics`).
 - Health check and automatic API documentation (Swagger/ReDoc).
 
 ### Planned
