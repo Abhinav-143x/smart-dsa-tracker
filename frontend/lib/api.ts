@@ -7,7 +7,8 @@ import {
   UserProgress, 
   TokenResponse,
   DashboardStats,
-  TodayPlan
+  TodayPlan,
+  AnalyticsReport
 } from '../types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -176,6 +177,17 @@ export const api = {
     });
     if (!response.ok) {
       throw new Error('Failed to fetch today plan');
+    }
+    return response.json();
+  },
+
+  // Analytics
+  async getAnalyticsReport(): Promise<AnalyticsReport> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/analytics/report`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch analytics report');
     }
     return response.json();
   }

@@ -7,6 +7,7 @@ from typing import List, Optional
 from datetime import datetime, timedelta
 import os
 import random
+import calendar
 
 from database import engine, Base, get_db, Problem, User, UserProgress, Streak
 import schemas
@@ -351,6 +352,103 @@ def get_today_plan(
         date=today.isoformat(),
         recommendations=recommendations[:5], # Limit to 5
         solved_today=solved_today
+    )
+
+# --- Analytics Endpoints ---
+
+@app.get("/api/v1/analytics/report", response_model=schemas.AnalyticsReport)
+def get_analytics_report(
+    current_user: User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    now = datetime.utcnow()
+    
+    # 1. Solve Velocity (Last 7d and 30d)
+    def get_velocity(days: int):
+        start_date = now - timedelta(days=days)
+        count = db.query(UserProgress).filter(
+            UserProgress.user_id == current_user.id,
+            UserProgress.status == "solved",
+            UserProgress.completed_at >= start_date
+        ).count()
+        return round(count / days, 2)
+    
+    velocity_7d = get_velocity(7)
+    velocity_30d = get_velocity(30)
+    
+    # 2. Topic Completion
+    topic_stats = []
+    topics = db.query(Problem.topic).distinct().all()
+    for (topic_name,) in topics:
+        total = db.query(Problem).filter(Problem.topic == topic_name).count()
+        solved = db.query(UserProgress).join(Problem).filter(
+            UserProgress.user_id == current_user.id,
+            UserProgress.status == "solved",
+            Problem.topic == topic_name
+        ).count()
+        percentage = round((solved / total) * 100, 2) if total > 0 else 0
+        topic_stats.append(schemas.TopicCompletion(
+            topic=topic_name,
+            percentage=percentage,
+            solved=solved,
+            total=total
+        ))
+    
+    # Sort topics by percentage descending
+    topic_stats.sort(key=lambda x: x.percentage, reverse=True)
+    
+    # 3. Weekly Distribution
+    weekly_dist = []
+    # sqlite specific weekday extraction: 0=Sunday, 1=Monday...
+    # We want a more cross-platform/pythonic way since we are using SQLAlchemy
+    day_counts = {i: 0 for i in range(7)} # 0=Monday, 6=Sunday in python's weekday()
+    
+    recent_solves = db.query(UserProgress.completed_at).filter(
+        UserProgress.user_id == current_user.id,
+        UserProgress.status == "solved",
+        UserProgress.completed_at.isnot(None)
+    ).all()
+    
+    for (completed_at,) in recent_solves:
+        day_counts[completed_at.weekday()] += 1
+        
+    days_of_week = list(calendar.day_name) # Monday to Sunday
+    for i in range(7):
+        weekly_dist.append(schemas.WeeklyActivity(
+            day=days_of_week[i],
+            count=day_counts[i]
+        ))
+    
+    # Most active day
+    most_active_idx = max(day_counts, key=day_counts.get)
+    most_active_day = days_of_week[most_active_idx] if sum(day_counts.values()) > 0 else "None"
+    
+    # 4. Revision Stats
+    total_revisions = db.query(func.sum(UserProgress.revision_count)).filter(
+        UserProgress.user_id == current_user.id
+    ).scalar() or 0
+    
+    # 5. Estimated Completion Date
+    est_completion = None
+    if velocity_30d > 0:
+        total_problems = db.query(Problem).count()
+        total_solved = db.query(UserProgress).filter(
+            UserProgress.user_id == current_user.id,
+            UserProgress.status == "solved"
+        ).count()
+        remaining = total_problems - total_solved
+        days_remaining = remaining / velocity_30d
+        est_date = now + timedelta(days=days_remaining)
+        est_completion = est_date.date().isoformat()
+        
+    return schemas.AnalyticsReport(
+        solve_velocity_7d=velocity_7d,
+        solve_velocity_30d=velocity_30d,
+        most_active_day=most_active_day,
+        topic_completion=topic_stats,
+        weekly_distribution=weekly_dist,
+        total_revision_count=total_revisions,
+        estimated_completion_date=est_completion
     )
 
 # --- Problem Engine Endpoints ---

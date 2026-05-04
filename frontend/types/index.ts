@@ -98,3 +98,25 @@ export interface TodayPlan {
   daily_goal: number;
   solved_today: number;
 }
+
+export interface TopicCompletion {
+  topic: string;
+  percentage: number;
+  solved: number;
+  total: number;
+}
+
+export interface WeeklyActivity {
+  day: string;
+  count: number;
+}
+
+export interface AnalyticsReport {
+  solve_velocity_7d: number;
+  solve_velocity_30d: number;
+  most_active_day?: string;
+  topic_completion: TopicCompletion[];
+  weekly_distribution: WeeklyActivity[];
+  total_revision_count: number;
+  estimated_completion_date?: string;
+}

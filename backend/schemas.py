@@ -124,3 +124,24 @@ class TodayPlan(BaseModel):
     recommendations: List[Recommendation]
     daily_goal: int = 3
     solved_today: int
+
+# --- Analytics Schemas ---
+
+class TopicCompletion(BaseModel):
+    topic: str
+    percentage: float
+    solved: int
+    total: int
+
+class WeeklyActivity(BaseModel):
+    day: str
+    count: int
+
+class AnalyticsReport(BaseModel):
+    solve_velocity_7d: float
+    solve_velocity_30d: float
+    most_active_day: Optional[str] = None
+    topic_completion: List[TopicCompletion]
+    weekly_distribution: List[WeeklyActivity]
+    total_revision_count: int
+    estimated_completion_date: Optional[str] = None

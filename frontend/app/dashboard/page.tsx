@@ -84,7 +84,14 @@ export default function DashboardPage() {
             <span className="text-xs font-bold uppercase tracking-widest">Back to Sheet</span>
           </Link>
           <div className="flex items-center gap-3">
-            <div className="text-right">
+            <Link 
+              href="/analytics" 
+              className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-zinc-800 hover:border-zinc-700 active:scale-95"
+            >
+              <BarChart3 className="h-4 w-4" />
+              <span>Advanced Analytics</span>
+            </Link>
+            <div className="text-right ml-4">
               <p className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Authenticated as</p>
               <p className="text-sm font-bold text-white">{user?.username}</p>
             </div>
