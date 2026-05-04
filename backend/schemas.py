@@ -60,3 +60,67 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+# --- Progress Schemas ---
+
+class UserProgressBase(BaseModel):
+    problem_id: int
+    status: str = "solved"  # pending, solved, revised
+    notes: Optional[str] = None
+
+class UserProgressCreate(UserProgressBase):
+    pass
+
+class UserProgressResponse(UserProgressBase):
+    id: int
+    user_id: int
+    completed_at: Optional[datetime] = None
+    revision_count: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class UserProgressUpdate(BaseModel):
+    status: Optional[str] = None
+    notes: Optional[str] = None
+    revision_count: Optional[int] = None
+
+# --- Dashboard Schemas ---
+
+class DifficultyStat(BaseModel):
+    difficulty: str
+    total: int
+    solved: int
+
+class TopicStat(BaseModel):
+    topic: str
+    total: int
+    solved: int
+
+class DailyActivity(BaseModel):
+    date: str
+    count: int
+
+class DashboardStats(BaseModel):
+    total_solved: int
+    total_problems: int
+    current_streak: int
+    longest_streak: int
+    difficulty_stats: List[DifficultyStat]
+    topic_stats: List[TopicStat]
+    recent_activity: List[DailyActivity]
+
+# --- Recommendation Schemas ---
+
+class Recommendation(BaseModel):
+    problem: ProblemResponse
+    reason: str
+    priority: int
+
+class TodayPlan(BaseModel):
+    date: str
+    recommendations: List[Recommendation]
+    daily_goal: int = 3
+    solved_today: int

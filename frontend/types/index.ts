@@ -33,3 +33,68 @@ export interface SubtopicResponse {
   count: number;
   topic: string;
 }
+
+export interface User {
+  id: number;
+  username: string;
+  email?: string;
+  created_at: string;
+  last_active: string;
+}
+
+export interface UserProgress {
+  id: number;
+  user_id: number;
+  problem_id: number;
+  status: 'pending' | 'solved' | 'revised';
+  completed_at?: string;
+  revision_count: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: string;
+}
+
+export interface DifficultyStat {
+  difficulty: string;
+  total: number;
+  solved: number;
+}
+
+export interface TopicStat {
+  topic: string;
+  total: number;
+  solved: number;
+}
+
+export interface DailyActivity {
+  date: string;
+  count: number;
+}
+
+export interface DashboardStats {
+  total_solved: number;
+  total_problems: number;
+  current_streak: number;
+  longest_streak: number;
+  difficulty_stats: DifficultyStat[];
+  topic_stats: TopicStat[];
+  recent_activity: DailyActivity[];
+}
+
+export interface Recommendation {
+  problem: Problem;
+  reason: string;
+  priority: number;
+}
+
+export interface TodayPlan {
+  date: string;
+  recommendations: Recommendation[];
+  daily_goal: number;
+  solved_today: number;
+}

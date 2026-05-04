@@ -5,18 +5,23 @@ import { api } from '@/lib/api';
 import { Problem, TopicResponse } from '@/types';
 import { ProgressDashboard } from '@/components/ProgressDashboard';
 import { TopicAccordion } from '@/components/TopicAccordion';
+import { TodayPlanWidget } from '@/components/TodayPlanWidget';
 import { Search, Filter, Loader2, X, Command, Code2, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth, useProgress } from '@/context/AuthContext';
 
 export default function ProblemsPage() {
   const [problems, setProblems] = useState<Problem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  // Auth and Progress Hooks
+  const { isAuthenticated } = useAuth();
+  const { solvedProblems, toggleSolved } = useProgress();
+
   // Filter states
   const [search, setSearch] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(null);
-  const [solvedIds, setSolvedIds] = useState<Set<number>>(new Set());
 
   useEffect(() => {
     const fetchData = async () => {
@@ -59,26 +64,26 @@ export default function ProblemsPage() {
       const filtered = diff ? problems.filter(p => p.difficulty === diff) : problems;
       return {
         total: filtered.length,
-        solved: filtered.filter(p => solvedIds.has(p.id)).length
+        solved: filtered.filter(p => solvedProblems.has(p.id)).length
       };
     };
 
     return {
       total: problems.length,
-      solved: solvedIds.size,
+      solved: solvedProblems.size,
       easy: getStats('Easy'),
       medium: getStats('Medium'),
       hard: getStats('Hard'),
     };
-  }, [problems, solvedIds]);
+  }, [problems, solvedProblems]);
 
-  const handleToggleSolved = (id: number) => {
-    setSolvedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const handleToggleSolved = async (id: number) => {
+    if (!isAuthenticated) {
+      // Could show a toast or redirect to login
+      alert('Please login to save your progress');
+      return;
+    }
+    await toggleSolved(id);
   };
 
   return (
@@ -111,6 +116,9 @@ export default function ProblemsPage() {
             </p>
           </div>
         </div>
+
+        {/* Today's Plan Widget */}
+        <TodayPlanWidget />
 
         {/* Controls Section */}
         <div className="mb-12 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">

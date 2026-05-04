@@ -2,7 +2,9 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ExternalLink, Target, Trophy, Flame } from 'lucide-react';
+import { ExternalLink, Target, Trophy, Flame, LogOut, User as UserIcon, LayoutDashboard } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import Link from 'next/link';
 
 interface ProgressDashboardProps {
   total: number;
@@ -19,6 +21,7 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
   medium,
   hard,
 }) => {
+  const { user, logout, isAuthenticated } = useAuth();
   const percentage = total > 0 ? Math.round((solved / total) * 100) : 0;
 
   return (
@@ -64,15 +67,48 @@ export const ProgressDashboard: React.FC<ProgressDashboardProps> = ({
             
             <div className="hidden h-10 w-px bg-zinc-900 lg:block" />
             
-            <a
-              href="https://takeuforward.org"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-red-700 hover:shadow-[0_0_20px_rgba(220,38,38,0.3)] active:scale-95"
-            >
-              <ExternalLink className="h-4 w-4" />
-              <span>TUF</span>
-            </a>
+            <div className="flex items-center gap-3">
+              <a
+                href="https://takeuforward.org"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-red-700 hover:shadow-[0_0_20px_rgba(220,38,38,0.3)] active:scale-95"
+              >
+                <ExternalLink className="h-4 w-4" />
+                <span className="hidden sm:inline">TUF</span>
+              </a>
+
+              {isAuthenticated ? (
+                <div className="flex items-center gap-3 ml-2 pl-4 border-l border-zinc-900">
+                  <Link
+                    href="/dashboard"
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-900 bg-zinc-950 text-zinc-500 transition-all hover:border-blue-500/50 hover:text-blue-500 hover:bg-blue-500/5"
+                    title="Dashboard"
+                  >
+                    <LayoutDashboard className="h-4 w-4" />
+                  </Link>
+                  <div className="hidden flex-col items-end sm:flex">
+                    <span className="text-[10px] font-black text-white uppercase tracking-wider">{user?.username}</span>
+                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Active Member</span>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-900 bg-zinc-950 text-zinc-500 transition-all hover:border-red-500/50 hover:text-red-500 hover:bg-red-500/5"
+                    title="Logout"
+                  >
+                    <LogOut className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <Link
+                  href="/login"
+                  className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900 px-5 py-2.5 text-xs font-black uppercase tracking-widest text-white transition-all hover:bg-zinc-800 hover:border-zinc-700 active:scale-95"
+                >
+                  <UserIcon className="h-4 w-4" />
+                  <span>Login</span>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>

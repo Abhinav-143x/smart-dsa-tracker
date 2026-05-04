@@ -4,10 +4,11 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import random
 
-from database import engine, Base, get_db, Problem, User
+from database import engine, Base, get_db, Problem, User, UserProgress, Streak
 import schemas
 import auth
 
@@ -19,6 +20,42 @@ app = FastAPI(
     description="Backend API for tracking DSA problem progress",
     version="0.1.0"
 )
+
+# --- Helper Functions ---
+
+def update_user_streak(user_id: int, db: Session):
+    """Update user streak based on recent activity"""
+    streak = db.query(Streak).filter(Streak.user_id == user_id).first()
+    if not streak:
+        streak = Streak(user_id=user_id, current_streak=0, longest_streak=0)
+        db.add(streak)
+    
+    today = datetime.utcnow().date()
+    
+    if streak.last_solve_date:
+        last_solve = streak.last_solve_date.date()
+        diff = (today - last_solve).days
+        
+        if diff == 0:
+            # Already solved today, no change
+            pass
+        elif diff == 1:
+            # Solved yesterday, increment streak
+            streak.current_streak += 1
+            streak.last_solve_date = datetime.utcnow()
+        else:
+            # Missed a day or more, reset streak
+            streak.current_streak = 1
+            streak.last_solve_date = datetime.utcnow()
+    else:
+        # First solve
+        streak.current_streak = 1
+        streak.last_solve_date = datetime.utcnow()
+    
+    if streak.current_streak > streak.longest_streak:
+        streak.longest_streak = streak.current_streak
+    
+    db.commit()
 
 # Configure CORS
 app.add_middleware(
@@ -65,6 +102,12 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    # Create streak record
+    new_streak = Streak(user_id=new_user.id)
+    db.add(new_streak)
+    db.commit()
+    
     return new_user
 
 @app.post("/api/v1/auth/login", response_model=schemas.Token)
@@ -88,6 +131,227 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 @app.get("/api/v1/auth/me", response_model=schemas.UserResponse)
 def read_users_me(current_user: User = Depends(auth.get_current_user)):
     return current_user
+
+# --- Progress Tracking Endpoints ---
+
+@app.get("/api/v1/progress", response_model=List[schemas.UserProgressResponse])
+def get_user_progress(
+    current_user: User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    return db.query(UserProgress).filter(UserProgress.user_id == current_user.id).all()
+
+@app.post("/api/v1/progress", response_model=schemas.UserProgressResponse)
+def update_or_create_progress(
+    progress_data: schemas.UserProgressCreate,
+    current_user: User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Check if problem exists
+    problem = db.query(Problem).filter(Problem.id == progress_data.problem_id).first()
+    if not problem:
+        raise HTTPException(status_code=404, detail="Problem not found")
+    
+    # Check if progress already exists
+    db_progress = db.query(UserProgress).filter(
+        UserProgress.user_id == current_user.id,
+        UserProgress.problem_id == progress_data.problem_id
+    ).first()
+    
+    if db_progress:
+        # Update existing progress
+        db_progress.status = progress_data.status
+        db_progress.notes = progress_data.notes
+        if progress_data.status == "solved" and not db_progress.completed_at:
+            db_progress.completed_at = datetime.utcnow()
+        db_progress.updated_at = datetime.utcnow()
+    else:
+        # Create new progress
+        db_progress = UserProgress(
+            user_id=current_user.id,
+            problem_id=progress_data.problem_id,
+            status=progress_data.status,
+            notes=progress_data.notes,
+            completed_at=datetime.utcnow() if progress_data.status == "solved" else None
+        )
+        db.add(db_progress)
+    
+    db.commit()
+
+    if db_progress.status == "solved":
+        update_user_streak(current_user.id, db)
+
+    db.refresh(db_progress)
+    return db_progress
+
+@app.get("/api/v1/progress/{problem_id}", response_model=schemas.UserProgressResponse)
+def get_problem_progress(
+    problem_id: int,
+    current_user: User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    db_progress = db.query(UserProgress).filter(
+        UserProgress.user_id == current_user.id,
+        UserProgress.problem_id == problem_id
+    ).first()
+    
+    if not db_progress:
+        raise HTTPException(status_code=404, detail="Progress record not found")
+    
+    return db_progress
+
+# --- Dashboard Endpoints ---
+
+@app.get("/api/v1/dashboard/stats", response_model=schemas.DashboardStats)
+def get_dashboard_stats(
+    current_user: User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    # Total progress
+    total_problems = db.query(Problem).count()
+    user_progress = db.query(UserProgress).filter(
+        UserProgress.user_id == current_user.id,
+        UserProgress.status == "solved"
+    ).all()
+    total_solved = len(user_progress)
+    
+    # Streak
+    streak = db.query(Streak).filter(Streak.user_id == current_user.id).first()
+    current_streak = streak.current_streak if streak else 0
+    longest_streak = streak.longest_streak if streak else 0
+    
+    # Difficulty breakdown
+    difficulties = ["Easy", "Medium", "Hard"]
+    diff_stats = []
+    for diff in difficulties:
+        total_diff = db.query(Problem).filter(Problem.difficulty == diff).count()
+        solved_diff = db.query(UserProgress).join(Problem).filter(
+            UserProgress.user_id == current_user.id,
+            UserProgress.status == "solved",
+            Problem.difficulty == diff
+        ).count()
+        diff_stats.append(schemas.DifficultyStat(difficulty=diff, total=total_diff, solved=solved_diff))
+    
+    # Topic breakdown
+    topics = db.query(Problem.topic).distinct().all()
+    topic_stats = []
+    for (topic_name,) in topics:
+        total_topic = db.query(Problem).filter(Problem.topic == topic_name).count()
+        solved_topic = db.query(UserProgress).join(Problem).filter(
+            UserProgress.user_id == current_user.id,
+            UserProgress.status == "solved",
+            Problem.topic == topic_name
+        ).count()
+        topic_stats.append(schemas.TopicStat(topic=topic_name, total=total_topic, solved=solved_topic))
+    
+    # Recent activity (Last 14 days)
+    recent_activity = []
+    today = datetime.utcnow().date()
+    for i in range(13, -1, -1):
+        date = today - timedelta(days=i)
+        count = db.query(UserProgress).filter(
+            UserProgress.user_id == current_user.id,
+            UserProgress.status == "solved",
+            func.date(UserProgress.completed_at) == date
+        ).count()
+        recent_activity.append(schemas.DailyActivity(date=date.isoformat(), count=count))
+    
+    return schemas.DashboardStats(
+        total_solved=total_solved,
+        total_problems=total_problems,
+        current_streak=current_streak,
+        longest_streak=longest_streak,
+        difficulty_stats=diff_stats,
+        topic_stats=topic_stats,
+        recent_activity=recent_activity
+    )
+
+# --- Recommendation Endpoints ---
+
+@app.get("/api/v1/recommendations/today", response_model=schemas.TodayPlan)
+def get_today_plan(
+    current_user: User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    # 1. Get solved problem IDs
+    solved_ids = [p.problem_id for p in db.query(UserProgress).filter(
+        UserProgress.user_id == current_user.id,
+        UserProgress.status == "solved"
+    ).all()]
+    
+    # 2. Get revision problem IDs
+    revision_ids = [p.problem_id for p in db.query(UserProgress).filter(
+        UserProgress.user_id == current_user.id,
+        UserProgress.status == "revised"
+    ).all()]
+    
+    recommendations = []
+    
+    # Logic 1: Next sequential problems (Top 3 unsolved)
+    next_problems = db.query(Problem).filter(
+        ~Problem.id.in_(solved_ids)
+    ).order_by(Problem.order_index.asc()).limit(3).all()
+    
+    for p in next_problems:
+        recommendations.append(schemas.Recommendation(
+            problem=p,
+            reason="Next in curriculum",
+            priority=1
+        ))
+    
+    # Logic 2: Revision needed
+    if revision_ids:
+        rev_problem = db.query(Problem).filter(Problem.id.in_(revision_ids)).first()
+        if rev_problem:
+            recommendations.append(schemas.Recommendation(
+                problem=rev_problem,
+                reason="Scheduled for revision",
+                priority=2
+            ))
+            
+    # Logic 3: Weak area / Unfinished Easy
+    # Find a topic where the user has solved something but not everything
+    topic_progress = db.query(
+        Problem.topic, 
+        func.count(Problem.id).label("total")
+    ).group_by(Problem.topic).all()
+    
+    for topic_name, total_in_topic in topic_progress:
+        solved_in_topic = db.query(UserProgress).join(Problem).filter(
+            UserProgress.user_id == current_user.id,
+            UserProgress.status == "solved",
+            Problem.topic == topic_name
+        ).count()
+        
+        if 0 < solved_in_topic < total_in_topic:
+            # Topic in progress, pick an unsolved easy problem from it
+            weak_problem = db.query(Problem).filter(
+                Problem.topic == topic_name,
+                Problem.difficulty == "Easy",
+                ~Problem.id.in_(solved_ids)
+            ).first()
+            
+            if weak_problem:
+                recommendations.append(schemas.Recommendation(
+                    problem=weak_problem,
+                    reason=f"Strengthen {topic_name}",
+                    priority=3
+                ))
+                break # Just one for now
+    
+    # Solved today count
+    today = datetime.utcnow().date()
+    solved_today = db.query(UserProgress).filter(
+        UserProgress.user_id == current_user.id,
+        UserProgress.status == "solved",
+        func.date(UserProgress.completed_at) == today
+    ).count()
+    
+    return schemas.TodayPlan(
+        date=today.isoformat(),
+        recommendations=recommendations[:5], # Limit to 5
+        solved_today=solved_today
+    )
 
 # --- Problem Engine Endpoints ---
 
