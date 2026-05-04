@@ -1,0 +1,53 @@
+site_name: Smart DSA Tracker
+site_description: A focused execution system for Striver DSA Sheet users to improve consistency and mastery.
+site_author: Abhinav-143x
+site_url: https://Abhinav-143x.github.io/smart-dsa-tracker/
+
+repo_name: Abhinav-143x/smart-dsa-tracker
+repo_url: https://github.com/Abhinav-143x/smart-dsa-tracker
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Tutorials:
+      - Setup Guide: tutorials/setup-guide.md
+  - Reference:
+      - Database Schema: reference/database-schema.md
+      - Roadmap: reference/roadmap.md
+  - Explanation:
+      - Architecture: explanation/architecture.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables

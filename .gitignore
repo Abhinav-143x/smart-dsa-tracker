@@ -69,3 +69,9 @@ debug/
 tmp/
 temp/
 *.tmp
+
+# Internal Tracking & AI Artifacts
+MEMORY.md
+DECISIONS.md
+gcli-request-*.json
+.gemini/
