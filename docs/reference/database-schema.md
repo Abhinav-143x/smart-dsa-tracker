@@ -53,7 +53,7 @@ Tracks the relationship between users and problems.
 | `updated_at` | DateTime | Last progress update. |
 
 ### `streaks`
-Tracks user consistency.
+Tracks user consistency and protection.
 
 | Column | Type | Description |
 | :--- | :--- | :--- |
@@ -62,10 +62,24 @@ Tracks user consistency.
 | `current_streak`| Integer | Number of consecutive days active. |
 | `longest_streak`| Integer | Historical best streak. |
 | `last_solve_date`| Date | Date of the most recent solved problem. |
+| `freeze_tokens` | Integer | Available streak protection tokens. |
+
+### `achievements`
+Stores milestone definitions.
+
+| Column | Type | Description |
+| :--- | :--- | :--- |
+| `id` | Integer (PK) | Record identifier. |
+| `name` | String | Name of the badge. |
+| `description` | String | Unlock criteria. |
+| `icon_name` | String | Icon identifier. |
+| `criteria_type`| String | logic type (solve_count, etc.). |
+| `criteria_value`| String | Target threshold. |
 
 ---
 
 ## Entity Relationship Summary
 - A **User** has many **UserProgress** records.
 - A **Problem** has many **UserProgress** records.
+- A **User** has many **UserAchievement** records.
 - A **User** has one **Streak** record.

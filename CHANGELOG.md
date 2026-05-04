@@ -43,6 +43,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated `backend/requirements.txt` with authentication and cryptography dependencies.
 - Enhanced `backend/.env.example` with authentication configuration.
 
+## [0.7.0] - 2026-05-04
+### Added
+- **Phase 7: Retention Systems**: Achievement/Badge system and Streak Protection (Freeze Tokens).
+- **Phase 6: Analytics Layer**: Advanced solve velocity tracking and predictive completion dates.
+- **Phase 5: Today Plan Engine**: Smart recommendations based on sequential order and revision needs.
+- **Phase 4: Dashboard Intelligence**: Global proficiency metrics and 14-day activity pulse.
+- **Phase 3: Progress System**: JWT Authentication and persistent user-specific tracking.
+- **Documentation**: Professional MkDocs site deployed via GitHub Actions.
+
+### Changed
+- Major UI overhaul to "Developer Dark Mode" with high-impact data visualizations.
+- Regrouped 474 problems to match the official TakeUForward curriculum.
+
 ## [0.1.0] - 2026-05-03
 
 ### Added
