@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
-import { DashboardStats } from '@/types';
+import { DashboardStats, Achievement, StreakInfo } from '@/types';
 import { useAuth } from '@/context/AuthContext';
 import { 
   Trophy, 
@@ -14,13 +14,20 @@ import {
   PieChart, 
   Calendar,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Award,
+  ShieldCheck,
+  Star,
+  Layout
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user, isAuthenticated, loading: authLoading } = useAuth();
@@ -33,20 +40,26 @@ export default function DashboardPage() {
       return;
     }
 
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await api.getDashboardStats();
-        setStats(data);
+        const [statsData, achData, streakData] = await Promise.all([
+          api.getDashboardStats(),
+          api.getAchievements(),
+          api.getStreakInfo()
+        ]);
+        setStats(statsData);
+        setAchievements(achData);
+        setStreakInfo(streakData);
       } catch (err) {
-        setError('Failed to load dashboard metrics.');
+        setError('Failed to load dashboard data.');
         console.error(err);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchStats();
+    fetchData();
   }, [isAuthenticated, authLoading]);
 
   if (loading || authLoading) {
@@ -134,16 +147,50 @@ export default function DashboardPage() {
             color="border-blue-500/20 bg-blue-500/5"
           />
           <StatCard 
-            title="Global Rank" 
-            value="Coming Soon" 
-            subtitle="Phase 7 Implementation" 
-            icon={<Activity className="h-6 w-6 text-zinc-500" />}
-            color="border-zinc-800 bg-zinc-900/50"
+            title="Streak Protection" 
+            value={streakInfo?.freeze_tokens || 0} 
+            subtitle="Freeze Tokens Available" 
+            icon={<ShieldCheck className="h-6 w-6 text-blue-400" />}
+            color="border-blue-400/20 bg-blue-400/5"
           />
         </div>
 
-        {/* Charts Section */}
         <div className="mt-12 grid gap-6 lg:grid-cols-3">
+          {/* Achievements Section */}
+          <div className="rounded-3xl border border-zinc-900 bg-zinc-900/30 p-8 lg:col-span-1">
+            <div className="mb-8 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Award className="h-5 w-5 text-blue-500" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-zinc-100">Milestones</h3>
+              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">
+                {achievements.filter(a => a.unlocked).length} / {achievements.length}
+              </span>
+            </div>
+            <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
+              {achievements.map((ach) => (
+                <div 
+                  key={ach.id} 
+                  className={cn(
+                    "flex items-start gap-4 rounded-2xl border p-4 transition-all",
+                    ach.unlocked ? "border-blue-500/20 bg-blue-500/5" : "border-zinc-800 bg-zinc-900/20 opacity-50"
+                  )}
+                >
+                  <div className={cn(
+                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl",
+                    ach.unlocked ? "bg-blue-500 text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]" : "bg-zinc-800 text-zinc-600"
+                  )}>
+                    {getAchievementIcon(ach.icon_name)}
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-zinc-100">{ach.name}</h4>
+                    <p className="mt-1 text-[10px] font-medium leading-relaxed text-zinc-500">{ach.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Difficulty Distribution */}
           <div className="rounded-3xl border border-zinc-900 bg-zinc-900/30 p-8 lg:col-span-1">
             <div className="mb-8 flex items-center justify-between">
@@ -256,4 +303,16 @@ function StatCard({ title, value, subtitle, icon, color }: { title: string, valu
       </div>
     </div>
   );
+}
+
+function getAchievementIcon(name: string) {
+  switch (name) {
+    case 'Zap': return <Zap className="h-5 w-5" />;
+    case 'Flame': return <Flame className="h-5 w-5" />;
+    case 'Trophy': return <Trophy className="h-5 w-5" />;
+    case 'Layout': return <Layout className="h-5 w-5" />;
+    case 'Award': return <Award className="h-5 w-5" />;
+    case 'Star': return <Star className="h-5 w-5" />;
+    default: return <Target className="h-5 w-5" />;
+  }
 }

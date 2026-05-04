@@ -76,8 +76,30 @@ class Streak(Base):
     current_streak = Column(Integer, default=0)
     longest_streak = Column(Integer, default=0)
     last_solve_date = Column(DateTime, nullable=True)
+    freeze_tokens = Column(Integer, default=0) # New field
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Achievement(Base):
+    """System-wide achievement definitions"""
+    __tablename__ = "achievements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(String(255), nullable=False)
+    icon_name = Column(String(50), nullable=False)
+    criteria_type = Column(String(50), nullable=False) # solve_count, streak_count, topic_completion
+    criteria_value = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class UserAchievement(Base):
+    """User unlocked achievements"""
+    __tablename__ = "user_achievements"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False)
+    unlocked_at = Column(DateTime, default=datetime.utcnow)
 
 def init_db():
     """Initialize database tables"""

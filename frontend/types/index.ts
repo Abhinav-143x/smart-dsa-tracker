@@ -120,3 +120,21 @@ export interface AnalyticsReport {
   total_revision_count: number;
   estimated_completion_date?: string;
 }
+
+export interface Achievement {
+  id: number;
+  name: string;
+  description: string;
+  icon_name: string;
+  criteria_type: string;
+  criteria_value: string;
+  unlocked: boolean;
+  unlocked_at?: string;
+}
+
+export interface StreakInfo {
+  current_streak: number;
+  longest_streak: number;
+  freeze_tokens: number;
+  last_solve_date?: string;
+}

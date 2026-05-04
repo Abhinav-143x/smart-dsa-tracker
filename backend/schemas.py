@@ -145,3 +145,27 @@ class AnalyticsReport(BaseModel):
     weekly_distribution: List[WeeklyActivity]
     total_revision_count: int
     estimated_completion_date: Optional[str] = None
+
+# --- Retention Schemas ---
+
+class AchievementResponse(BaseModel):
+    id: int
+    name: str
+    description: str
+    icon_name: str
+    criteria_type: str
+    criteria_value: str
+    unlocked: bool = False
+    unlocked_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class StreakResponse(BaseModel):
+    current_streak: int
+    longest_streak: int
+    freeze_tokens: int
+    last_solve_date: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

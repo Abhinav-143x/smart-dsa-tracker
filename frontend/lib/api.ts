@@ -8,7 +8,9 @@ import {
   TokenResponse,
   DashboardStats,
   TodayPlan,
-  AnalyticsReport
+  AnalyticsReport,
+  Achievement,
+  StreakInfo
 } from '../types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -188,6 +190,27 @@ export const api = {
     });
     if (!response.ok) {
       throw new Error('Failed to fetch analytics report');
+    }
+    return response.json();
+  },
+
+  // Retention
+  async getAchievements(): Promise<Achievement[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/retention/achievements`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch achievements');
+    }
+    return response.json();
+  },
+
+  async getStreakInfo(): Promise<StreakInfo> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/retention/streak`, {
+      headers: getHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch streak info');
     }
     return response.json();
   }

@@ -9,7 +9,7 @@ import os
 import random
 import calendar
 
-from database import engine, Base, get_db, Problem, User, UserProgress, Streak
+from database import engine, Base, get_db, Problem, User, UserProgress, Streak, Achievement, UserAchievement
 import schemas
 import auth
 
@@ -24,11 +24,65 @@ app = FastAPI(
 
 # --- Helper Functions ---
 
+def init_achievements(db: Session):
+    """Seed default achievements if they don't exist"""
+    default_achievements = [
+        {"name": "First Blood", "description": "Solve your first problem.", "icon_name": "Zap", "criteria_type": "solve_count", "criteria_value": "1"},
+        {"name": "Consistency Starter", "description": "Achieve a 3-day streak.", "icon_name": "Flame", "criteria_type": "streak_count", "criteria_value": "3"},
+        {"name": "Weekly Warrior", "description": "Achieve a 7-day streak.", "icon_name": "Trophy", "criteria_type": "streak_count", "criteria_value": "7"},
+        {"name": "Array Apprentice", "description": "Solve 10 Array problems.", "icon_name": "Layout", "criteria_type": "topic_completion", "criteria_value": "Arrays:10"},
+        {"name": "DSA Enthusiast", "description": "Solve 50 problems in total.", "icon_name": "Award", "criteria_type": "solve_count", "criteria_value": "50"},
+        {"name": "Master of Logic", "description": "Solve 100 problems in total.", "icon_name": "Star", "criteria_type": "solve_count", "criteria_value": "100"},
+    ]
+    
+    for ach in default_achievements:
+        exists = db.query(Achievement).filter(Achievement.name == ach["name"]).first()
+        if not exists:
+            db.add(Achievement(**ach))
+    db.commit()
+
+def check_achievements(user_id: int, db: Session):
+    """Check and unlock achievements for a user"""
+    # Get all achievements the user HASN'T unlocked yet
+    unlocked_ids = [ua.achievement_id for ua in db.query(UserAchievement).filter(UserAchievement.user_id == user_id).all()]
+    pending_achievements = db.query(Achievement).filter(~Achievement.id.in_(unlocked_ids)).all()
+    
+    if not pending_achievements:
+        return
+    
+    # Get user stats
+    total_solved = db.query(UserProgress).filter(UserProgress.user_id == user_id, UserProgress.status == "solved").count()
+    streak = db.query(Streak).filter(Streak.user_id == user_id).first()
+    current_streak = streak.current_streak if streak else 0
+    
+    for ach in pending_achievements:
+        unlocked = False
+        if ach.criteria_type == "solve_count":
+            if total_solved >= int(ach.criteria_value):
+                unlocked = True
+        elif ach.criteria_type == "streak_count":
+            if current_streak >= int(ach.criteria_value):
+                unlocked = True
+        elif ach.criteria_type == "topic_completion":
+            topic, count_str = ach.criteria_value.split(":")
+            topic_solved = db.query(UserProgress).join(Problem).filter(
+                UserProgress.user_id == user_id,
+                UserProgress.status == "solved",
+                Problem.topic == topic
+            ).count()
+            if topic_solved >= int(count_str):
+                unlocked = True
+        
+        if unlocked:
+            db.add(UserAchievement(user_id=user_id, achievement_id=ach.id))
+    
+    db.commit()
+
 def update_user_streak(user_id: int, db: Session):
-    """Update user streak based on recent activity"""
+    """Update user streak based on recent activity, handling freezes"""
     streak = db.query(Streak).filter(Streak.user_id == user_id).first()
     if not streak:
-        streak = Streak(user_id=user_id, current_streak=0, longest_streak=0)
+        streak = Streak(user_id=user_id, current_streak=0, longest_streak=0, freeze_tokens=1) # Start with 1 token
         db.add(streak)
     
     today = datetime.utcnow().date()
@@ -38,16 +92,25 @@ def update_user_streak(user_id: int, db: Session):
         diff = (today - last_solve).days
         
         if diff == 0:
-            # Already solved today, no change
+            # Already solved today
             pass
         elif diff == 1:
-            # Solved yesterday, increment streak
+            # Solved yesterday, increment
             streak.current_streak += 1
             streak.last_solve_date = datetime.utcnow()
         else:
-            # Missed a day or more, reset streak
-            streak.current_streak = 1
-            streak.last_solve_date = datetime.utcnow()
+            # Missed a day or more
+            # Check for freeze tokens
+            needed_tokens = diff - 1
+            if streak.freeze_tokens >= needed_tokens:
+                # Protection applied!
+                streak.freeze_tokens -= needed_tokens
+                streak.current_streak += 1
+                streak.last_solve_date = datetime.utcnow()
+            else:
+                # Reset
+                streak.current_streak = 1
+                streak.last_solve_date = datetime.utcnow()
     else:
         # First solve
         streak.current_streak = 1
@@ -55,8 +118,19 @@ def update_user_streak(user_id: int, db: Session):
     
     if streak.current_streak > streak.longest_streak:
         streak.longest_streak = streak.current_streak
-    
+        
+    # Award a freeze token every 10 solves (simplified logic)
+    total_solved = db.query(UserProgress).filter(UserProgress.user_id == user_id, UserProgress.status == "solved").count()
+    if total_solved > 0 and total_solved % 10 == 0:
+        streak.freeze_tokens += 1
+        
     db.commit()
+
+# On startup, seed achievements
+@app.on_event("startup")
+def startup_event():
+    db = next(get_db())
+    init_achievements(db)
 
 # Configure CORS
 app.add_middleware(
@@ -181,6 +255,7 @@ def update_or_create_progress(
 
     if db_progress.status == "solved":
         update_user_streak(current_user.id, db)
+        check_achievements(current_user.id, db)
 
     db.refresh(db_progress)
     return db_progress
@@ -450,6 +525,46 @@ def get_analytics_report(
         total_revision_count=total_revisions,
         estimated_completion_date=est_completion
     )
+
+# --- Retention Endpoints ---
+
+@app.get("/api/v1/retention/achievements", response_model=List[schemas.AchievementResponse])
+def get_achievements(
+    current_user: User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    all_achievements = db.query(Achievement).all()
+    user_unlocked = db.query(UserAchievement).filter(UserAchievement.user_id == current_user.id).all()
+    unlocked_map = {ua.achievement_id: ua.unlocked_at for ua in user_unlocked}
+    
+    result = []
+    for ach in all_achievements:
+        is_unlocked = ach.id in unlocked_map
+        result.append(schemas.AchievementResponse(
+            id=ach.id,
+            name=ach.name,
+            description=ach.description,
+            icon_name=ach.icon_name,
+            criteria_type=ach.criteria_type,
+            criteria_value=ach.criteria_value,
+            unlocked=is_unlocked,
+            unlocked_at=unlocked_map.get(ach.id)
+        ))
+    return result
+
+@app.get("/api/v1/retention/streak", response_model=schemas.StreakResponse)
+def get_streak_info(
+    current_user: User = Depends(auth.get_current_user),
+    db: Session = Depends(get_db)
+):
+    streak = db.query(Streak).filter(Streak.user_id == current_user.id).first()
+    if not streak:
+        # Create default streak if not found
+        streak = Streak(user_id=current_user.id, current_streak=0, longest_streak=0, freeze_tokens=1)
+        db.add(streak)
+        db.commit()
+        db.refresh(streak)
+    return streak
 
 # --- Problem Engine Endpoints ---
 
